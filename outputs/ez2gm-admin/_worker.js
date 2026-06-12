@@ -12,13 +12,13 @@ export default {
 
     const target = new URL(request.url);
     if (host === "admin.ez2gm.com") {
-      target.pathname = "/index.html";
+      target.pathname = "/";
       target.search = "";
       return env.ASSETS.fetch(new Request(target, request));
     }
 
     if (host === "ez2gm.com" || host === "www.ez2gm.com") {
-      target.pathname = "/storefront.html";
+      target.pathname = "/storefront";
       target.search = "";
       return env.ASSETS.fetch(new Request(target, request));
     }
