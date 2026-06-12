@@ -17,6 +17,10 @@ const rolePolicies = {
 
 const publicRoutes = [
   ["GET", "/api/health"],
+  ["GET", "/api/public/catalog"],
+  ["GET", "/api/public/orders/:orderNo"],
+  ["POST", "/api/public/orders"],
+  ["POST", "/api/public/chats/:orderNo/messages"],
   ["POST", "/api/auth/login"],
   ["POST", "/api/payments/:platform/webhook"],
   ["POST", "/api/analytics/event"],
@@ -117,9 +121,21 @@ const aiEmployees = [
   { name: "AI数据分析", scope: "views, stay-time, conversion", status: "active" }
 ];
 
-function corsHeaders(env) {
+function corsHeaders(env, request = null) {
+  const configuredOrigins = String(env.PUBLIC_ORIGIN || "https://ez2gm.com")
+    .split(",")
+    .map(item => item.trim())
+    .filter(Boolean);
+  const allowedOrigins = new Set([
+    ...configuredOrigins,
+    "https://ez2gm.com",
+    "https://www.ez2gm.com",
+    "https://admin.ez2gm.com"
+  ]);
+  const requestOrigin = request?.headers?.get("origin") || "";
+  const allowedOrigin = allowedOrigins.has(requestOrigin) ? requestOrigin : (configuredOrigins[0] || "https://ez2gm.com");
   return {
-    "Access-Control-Allow-Origin": env.PUBLIC_ORIGIN || "https://ez2gm.com",
+    "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Role",
     "Access-Control-Max-Age": "86400",
@@ -127,18 +143,18 @@ function corsHeaders(env) {
   };
 }
 
-function json(payload, status = 200, env = {}) {
+function json(payload, status = 200, env = {}, request = null) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      ...corsHeaders(env)
+      ...corsHeaders(env, request)
     }
   });
 }
 
-function error(message, status = 500, env = {}, detail = undefined) {
-  return json({ ok: false, error: message, detail }, status, env);
+function error(message, status = 500, env = {}, detail = undefined, request = null) {
+  return json({ ok: false, error: message, detail }, status, env, request);
 }
 
 async function readJson(request) {
@@ -219,6 +235,11 @@ async function verifyPassword(password, storedHash = "") {
   if (algorithm !== passwordAlgorithm || !iterationsText || !saltText || !digestText) return false;
   const iterations = Number(iterationsText);
   if (!Number.isInteger(iterations) || iterations < 100000) return false;
+  if (iterations > 100000) {
+    const err = new Error("PASSWORD_HASH_REQUIRES_REHASH");
+    err.status = 401;
+    throw err;
+  }
 
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
@@ -463,6 +484,76 @@ async function getOrderRecord(orderNo, actor, env) {
   };
 }
 
+async function getPublicCatalog({ env }) {
+  const [projects, contentRows] = await Promise.all([
+    query(env, "select game, project, service_type, frontend_price, mode, status, image_url, required_fields from game_projects where coalesce(status, 'active') = 'active' order by game, service_type, project limit 120"),
+    query(env, "select payload from frontend_content order by updated_at desc limit 1")
+  ]);
+  return {
+    ok: true,
+    data: {
+      content: contentRows[0]?.payload || {},
+      projects: projects.map(item => ({
+        game: item.game,
+        project: item.project,
+        serviceType: item.service_type,
+        price: item.frontend_price,
+        mode: item.mode,
+        status: item.status,
+        imageUrl: item.image_url,
+        requiredFields: item.required_fields
+      }))
+    }
+  };
+}
+
+async function getPublicOrderStatus({ params, env }) {
+  const normalized = normalizeOrderNo(params.orderNo);
+  const orders = await query(env, "select id, order_no, game, project, status, payment_status, updated_at from orders where order_no = $1 limit 1", [normalized]);
+  const order = orders[0];
+  if (!order) return { status: 404, payload: { ok: false, error: "ORDER_NOT_FOUND" } };
+  const [items, threads] = await Promise.all([
+    query(env, "select item_name, server, qty, price, status from order_items where order_id = $1 order by created_at, id", [order.id]),
+    query(env, "select customer_online, unread_count, updated_at from chat_threads where order_id = $1 order by created_at desc limit 1", [order.id])
+  ]);
+  return {
+    ok: true,
+    data: {
+      orderNo: order.order_no,
+      game: order.game,
+      project: order.project,
+      status: order.status,
+      payment: order.payment_status,
+      updatedAt: order.updated_at,
+      items: items.map(item => ({
+        name: item.item_name,
+        server: item.server || "",
+        qty: item.qty || "",
+        price: item.price || "",
+        status: item.status
+      })),
+      support: threads[0] ? {
+        online: Boolean(threads[0].customer_online),
+        unread: Number(threads[0].unread_count || 0),
+        updatedAt: threads[0].updated_at
+      } : { online: false, unread: 0 }
+    }
+  };
+}
+
+async function createPublicOrder({ body, env }) {
+  return createOrder({
+    body: {
+      ...body,
+      payment: body.payment || "manual-quote",
+      supplierPrice: "",
+      profit: ""
+    },
+    actor: { account: "frontend-customer", role: "public" },
+    env
+  });
+}
+
 async function ensureThread(orderNo, actor, env) {
   const normalized = normalizeOrderNo(orderNo);
   const orders = await query(env, "select id from orders where order_no = $1 limit 1", [normalized]);
@@ -558,7 +649,7 @@ async function createAccount({ body, actor, env }) {
 
 async function hashPassword(password, env) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const iterations = Number(env.PASSWORD_ITERATIONS || 210000);
+  const iterations = Number(env.PASSWORD_ITERATIONS || 100000);
   const keyMaterial = await crypto.subtle.importKey("raw", encoder.encode(String(password || "")), "PBKDF2", false, ["deriveBits"]);
   const digest = new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations, hash: "SHA-256" }, keyMaterial, 256));
   return `${passwordAlgorithm}$${iterations}$${base64UrlEncode(salt)}$${base64UrlEncode(digest)}`;
@@ -744,20 +835,20 @@ async function createSignedUpload({ body, actor, env, request }) {
 }
 
 async function directUpload({ params, request, env }) {
-  if (!env.EZ2GM_UPLOADS) return error("R2_BUCKET_NOT_BOUND", 500, env);
+  if (!env.EZ2GM_UPLOADS) return error("R2_BUCKET_NOT_BOUND", 500, env, undefined, request);
   const url = new URL(request.url);
   const objectKey = params.key;
   const expires = Number(url.searchParams.get("expires"));
   const actor = url.searchParams.get("actor") || "";
   const token = url.searchParams.get("token") || "";
-  if (!objectKey || !expires || expires < Date.now()) return error("UPLOAD_URL_EXPIRED", 403, env);
+  if (!objectKey || !expires || expires < Date.now()) return error("UPLOAD_URL_EXPIRED", 403, env, undefined, request);
   const expected = base64UrlEncode(await hmacBytes(env.UPLOAD_SIGNING_SECRET || env.SESSION_SECRET, `${objectKey}.${expires}.${actor}`));
-  if (!(await timingSafeEqual(expected, token))) return error("INVALID_UPLOAD_TOKEN", 403, env);
+  if (!(await timingSafeEqual(expected, token))) return error("INVALID_UPLOAD_TOKEN", 403, env, undefined, request);
   await env.EZ2GM_UPLOADS.put(objectKey, request.body, {
     httpMetadata: { contentType: request.headers.get("content-type") || "application/octet-stream" },
     customMetadata: { uploadedBy: actor }
   });
-  return json({ ok: true, objectKey, publicUrl: `${env.R2_PUBLIC_BASE_URL || "https://img.ez2gm.com"}/${objectKey}` }, 201, env);
+  return json({ ok: true, objectKey, publicUrl: `${env.R2_PUBLIC_BASE_URL || "https://img.ez2gm.com"}/${objectKey}` }, 201, env, request);
 }
 
 async function createUploadRecord({ body, actor, env }) {
@@ -792,6 +883,15 @@ function pricingResult(rule) {
 
 const routes = [
   ["GET", "/api/health", async ({ env }) => ({ ok: true, app: env.APP_NAME || "EZ2GM API", database: Boolean(env.DATABASE_URL), time: new Date().toISOString() })],
+  ["GET", "/api/public/catalog", getPublicCatalog],
+  ["GET", "/api/public/orders/:orderNo", getPublicOrderStatus],
+  ["POST", "/api/public/orders", createPublicOrder],
+  ["POST", "/api/public/chats/:orderNo/messages", async ({ params, body, env }) => addMessage({
+    params,
+    body: { ...body, sender: "customer" },
+    actor: { account: "frontend-customer", role: "customer" },
+    env
+  })],
   ["GET", "/api/system/database", async ({ env }) => {
     const startedAt = Date.now();
     await query(env, "select 1 as ok");
@@ -956,10 +1056,10 @@ const routes = [
 
 export default {
   async fetch(request, env) {
-    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(env) });
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(env, request) });
     const url = new URL(request.url);
     const found = findRoute(request.method, url.pathname);
-    if (!found) return error("NOT_FOUND", 404, env);
+    if (!found) return error("NOT_FOUND", 404, env, undefined, request);
 
     try {
       const body = await readJson(request);
@@ -968,15 +1068,15 @@ export default {
         const authorization = request.headers.get("authorization") || "";
         const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
         actor = await verifyToken(token, env);
-        if (!actor) return error("UNAUTHORIZED", 401, env);
-        if (!checkPermission(actor.role, request.method, url.pathname)) return error("FORBIDDEN", 403, env);
+        if (!actor) return error("UNAUTHORIZED", 401, env, undefined, request);
+        if (!checkPermission(actor.role, request.method, url.pathname)) return error("FORBIDDEN", 403, env, undefined, request);
       }
       const result = await found.route.handler({ request, env, url, params: found.params, body, actor });
       if (result instanceof Response) return result;
-      if (result?.payload) return json(result.payload, result.status || 200, env);
-      return json(result || { ok: true }, result?.status || 200, env);
+      if (result?.payload) return json(result.payload, result.status || 200, env, request);
+      return json(result || { ok: true }, result?.status || 200, env, request);
     } catch (err) {
-      return error(err.message || "SERVER_ERROR", err.status || 500, env);
+      return error(err.message || "SERVER_ERROR", err.status || 500, env, undefined, request);
     }
   }
 };

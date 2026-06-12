@@ -5,7 +5,7 @@
 Repository:
 
 ```text
-https://github.com/ducthuy20041977-jpg/ez2gm.git
+https://github.com/ducthuy20041977-jpg/ez2game1.git
 ```
 
 This workspace does not have `git` installed, so upload the project through GitHub Desktop, Git Bash, or the GitHub web UI. Do not upload `node_modules` or `.env` files.
@@ -13,10 +13,11 @@ This workspace does not have `git` installed, so upload the project through GitH
 ## Domain Layout
 
 ```text
-ez2gm.com       -> Cloudflare Pages frontend/admin
-www.ez2gm.com   -> redirect to ez2gm.com
-api.ez2gm.com   -> backend API
-img.ez2gm.com   -> Cloudflare R2 public images
+ez2gm.com         -> Cloudflare Pages customer storefront
+www.ez2gm.com     -> redirect to ez2gm.com
+admin.ez2gm.com   -> Cloudflare Pages admin console
+api.ez2gm.com     -> Cloudflare Worker API
+img.ez2gm.com     -> Cloudflare R2 public images
 ```
 
 ## Files To Upload
@@ -32,55 +33,71 @@ outputs/ez2gm-admin/preview*.png
 
 The `.gitignore` already covers these.
 
-## Deploy Backend On Render
+## Deploy API On Cloudflare Workers
 
-1. Open Render.
-2. New + -> Blueprint.
-3. Connect the GitHub repo.
-4. Render will read `render.yaml`.
-5. Fill secret environment variables:
+The Worker is configured by `wrangler.toml` and deployed by the project deploy command:
+
+```text
+npm run worker:deploy
+```
+
+Required Worker secrets:
 
 ```text
 DATABASE_URL=<Neon connection string>
 SESSION_SECRET=<long random string>
 ENCRYPTION_KEY=<long random string>
-R2_ACCESS_KEY_ID=<Cloudflare R2 key id>
-R2_SECRET_ACCESS_KEY=<Cloudflare R2 secret>
+UPLOAD_SIGNING_SECRET=<long random string>
 ```
 
-6. After deploy, open:
+Required Worker variables:
 
 ```text
-https://<render-service-url>/api/health
+APP_NAME=EZ2GM API
+PUBLIC_ORIGIN=https://ez2gm.com
+R2_PUBLIC_BASE_URL=https://img.ez2gm.com
+PASSWORD_ITERATIONS=100000
 ```
 
-7. Add custom domain in Render:
+Required Worker binding:
 
 ```text
-api.ez2gm.com
+EZ2GM_UPLOADS -> R2 bucket ez2gm
 ```
 
-8. Add the DNS record Render gives you in Cloudflare.
+After deploy, open:
 
-## Deploy Frontend On Cloudflare Pages
+```text
+https://api.ez2gm.com/api/health
+```
+
+## Deploy Frontend And Admin On Cloudflare Pages
 
 1. Cloudflare -> Workers & Pages -> Create application -> Pages.
 2. Connect the GitHub repo.
 3. Build settings:
 
 ```text
-Build command: empty
+Build command: npm install
 Build output directory: outputs/ez2gm-admin
 Root directory: empty
 ```
 
-4. Add custom domains:
+4. Deploy command:
+
+```text
+npm run worker:deploy
+```
+
+5. Add custom domains to the Pages project:
 
 ```text
 ez2gm.com
 www.ez2gm.com
+admin.ez2gm.com
 ```
 
+`_worker.js` sends `ez2gm.com` to the storefront and `admin.ez2gm.com` to the admin console.
 `_redirects` redirects `www.ez2gm.com` to `ez2gm.com`.
 
 ## R2 Public Images
@@ -97,22 +114,12 @@ Custom domain:
 img.ez2gm.com
 ```
 
-Run CORS once from backend if needed:
-
-```powershell
-cd outputs\ez2gm-admin\backend
-$env:R2_ENDPOINT="https://d643ff49897302d31734dbc69c5895f2.r2.cloudflarestorage.com"
-$env:R2_BUCKET="ez2gm"
-$env:R2_ACCESS_KEY_ID="<key>"
-$env:R2_SECRET_ACCESS_KEY="<secret>"
-npm.cmd run r2:cors
-```
-
 ## Final Checks
 
 ```text
 https://api.ez2gm.com/api/health
 https://ez2gm.com
+https://admin.ez2gm.com
 https://img.ez2gm.com/<known-test-file>
 ```
 

@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EZ2GM Game Services</title>
+  <meta name="description" content="EZ2GM game gold, items, boosting, escort, CDK and top-up services." />
+  <style>
+    :root {
+      color-scheme: light;
+      --blue: #1267e5;
+      --blue-dark: #0d3d91;
+      --ink: #10213d;
+      --muted: #64748b;
+      --line: #dbe7f5;
+      --panel: #ffffff;
+      --soft: #eef6ff;
+      --green: #0f9f6e;
+      --amber: #bc7a10;
+      --shadow: 0 18px 50px rgba(17, 75, 145, 0.14);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: #f7fbff;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button, input, select, textarea { font: inherit; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      min-height: 72px;
+      padding: 0 clamp(18px, 5vw, 72px);
+      background: rgba(255, 255, 255, 0.92);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 900;
+      letter-spacing: 0;
+      font-size: 22px;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: var(--blue);
+      color: #fff;
+      box-shadow: 0 10px 22px rgba(18, 103, 229, 0.25);
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .nav a:hover { color: var(--blue); }
+
+    .btn {
+      border: 0;
+      border-radius: 8px;
+      min-height: 44px;
+      padding: 0 18px;
+      background: var(--blue);
+      color: #fff;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 12px 28px rgba(18, 103, 229, 0.2);
+    }
+
+    .btn.secondary {
+      background: #fff;
+      color: var(--blue);
+      border: 1px solid var(--line);
+      box-shadow: none;
+    }
+
+    .btn.ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      box-shadow: none;
+    }
+
+    .page {
+      display: grid;
+      gap: 42px;
+      padding-bottom: 56px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.02fr) minmax(360px, 0.98fr);
+      gap: clamp(28px, 5vw, 58px);
+      align-items: center;
+      padding: clamp(36px, 7vw, 88px) clamp(18px, 5vw, 72px) 26px;
+      background:
+        linear-gradient(180deg, rgba(230, 243, 255, 0.9), rgba(247, 251, 255, 0.98)),
+        #f7fbff;
+    }
+
+    .hero-copy h1 {
+      margin: 0 0 18px;
+      max-width: 780px;
+      font-size: clamp(42px, 6vw, 74px);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    .hero-copy p {
+      margin: 0;
+      max-width: 640px;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.7;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 26px;
+    }
+
+    .trust-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 28px;
+      max-width: 640px;
+    }
+
+    .trust-card {
+      min-height: 74px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.76);
+    }
+
+    .trust-card strong {
+      display: block;
+      font-size: 22px;
+      color: var(--blue-dark);
+    }
+
+    .trust-card span {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .hero-board {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .visual-tile {
+      position: relative;
+      overflow: hidden;
+      min-height: 170px;
+      border-radius: 8px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .visual-tile.large { grid-row: span 2; min-height: 354px; }
+    .visual-tile img {
+      width: 100%;
+      height: 100%;
+      min-height: inherit;
+      object-fit: cover;
+      display: block;
+    }
+
+    .visual-label {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(219, 231, 245, 0.9);
+      color: var(--ink);
+      font-weight: 900;
+    }
+
+    .section {
+      width: min(1180px, calc(100% - 36px));
+      margin: 0 auto;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 18px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: clamp(26px, 4vw, 38px);
+      letter-spacing: 0;
+    }
+
+    .section-head p {
+      margin: 8px 0 0;
+      max-width: 620px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .search-strip {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr auto;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .field span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      padding: 10px 12px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 104px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: rgba(18, 103, 229, 0.7);
+      box-shadow: 0 0 0 4px rgba(18, 103, 229, 0.1);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .service-card {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 12px 34px rgba(16, 33, 61, 0.08);
+    }
+
+    .service-card img {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      display: block;
+      background: #eaf3ff;
+    }
+
+    .service-body {
+      display: grid;
+      gap: 12px;
+      padding: 16px;
+    }
+
+    .service-top {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .service-top h3 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: var(--soft);
+      color: var(--blue-dark);
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .service-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 0.82fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-head h2, .panel-head h3 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+
+    .panel-body {
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .form-grid .wide { grid-column: 1 / -1; }
+
+    .status-box {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fbff;
+      color: var(--muted);
+      min-height: 92px;
+    }
+
+    .status-box strong {
+      color: var(--ink);
+      font-size: 18px;
+    }
+
+    .inline {
+      display: flex;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .step {
+      min-height: 120px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .step b {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      background: var(--blue);
+      color: #fff;
+    }
+
+    .step strong { display: block; margin-bottom: 6px; }
+    .step span { color: var(--muted); line-height: 1.5; font-size: 14px; }
+
+    .footer {
+      padding: 30px clamp(18px, 5vw, 72px);
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      background: #fff;
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+      font-size: 14px;
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 30;
+      max-width: min(420px, calc(100vw - 36px));
+      padding: 14px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #fff;
+      box-shadow: var(--shadow);
+      color: var(--ink);
+      transform: translateY(120%);
+      transition: transform 0.2s ease;
+    }
+
+    .toast.show { transform: translateY(0); }
+
+    @media (max-width: 980px) {
+      .hero, .two-col { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .search-strip { grid-template-columns: 1fr; }
+      .nav { display: none; }
+    }
+
+    @media (max-width: 640px) {
+      .topbar { min-height: 64px; }
+      .hero { padding-top: 28px; }
+      .grid, .trust-row, .steps, .form-grid, .hero-board { grid-template-columns: 1fr; }
+      .visual-tile.large { min-height: 220px; }
+      .inline { display: grid; }
+      .section { width: min(100% - 24px, 1180px); }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="EZ2GM home">
+      <span class="brand-mark">EZ</span>
+      <span>EZ2GM</span>
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="#services">Services</a>
+      <a href="#quote">Quote</a>
+      <a href="#lookup">Order lookup</a>
+      <a href="#support">Support</a>
+    </nav>
+    <a class="btn secondary" href="#quote">Start order</a>
+  </header>
+
+  <main id="top" class="page">
+    <section class="hero">
+      <div class="hero-copy">
+        <h1>Game services, handled fast.</h1>
+        <p>EZ2GM helps players request gold, gear, boosting, escort runs, CDK and top-up services with order tracking and human support when the order needs extra care.</p>
+        <div class="hero-actions">
+          <a class="btn" href="#services">Browse services</a>
+          <a class="btn secondary" href="#lookup">Track order</a>
+        </div>
+        <div class="trust-row" aria-label="Service stats">
+          <div class="trust-card"><strong>24/7</strong><span>order intake</span></div>
+          <div class="trust-card"><strong>30m</strong><span>fast review target</span></div>
+          <div class="trust-card"><strong>1:1</strong><span>support handoff</span></div>
+        </div>
+      </div>
+      <div class="hero-board" aria-label="Popular service visuals">
+        <article class="visual-tile large">
+          <img src="/assets/projects/service-gear.png" alt="Game gear service" />
+          <div class="visual-label"><span>Gear & Items</span><span class="badge">Manual quote</span></div>
+        </article>
+        <article class="visual-tile">
+          <img src="/assets/projects/service-gold.png" alt="Game gold service" />
+          <div class="visual-label"><span>Gold</span></div>
+        </article>
+        <article class="visual-tile">
+          <img src="/assets/projects/service-escort.png" alt="Escort run service" />
+          <div class="visual-label"><span>Escort Runs</span></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="search-strip">
+        <label class="field">
+          <span>Search game or item</span>
+          <input id="serviceSearch" type="search" placeholder="Diablo 4 item, WoW gold, boosting..." autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Service type</span>
+          <select id="serviceType">
+            <option value="">All services</option>
+            <option value="gold">Gold</option>
+            <option value="gear">Items / Gear</option>
+            <option value="boosting">Boosting</option>
+            <option value="escort">Escort</option>
+            <option value="cdk">CDK</option>
+            <option value="topup">Top-up</option>
+          </select>
+        </label>
+        <button class="btn" id="filterServices" type="button">Search</button>
+      </div>
+    </section>
+
+    <section id="services" class="section">
+      <div class="section-head">
+        <div>
+          <h2>Popular Services</h2>
+          <p>Service content is controlled from the EZ2GM backend. The storefront only displays customer-safe names, frontend prices and service images.</p>
+        </div>
+      </div>
+      <div id="serviceGrid" class="grid" aria-live="polite"></div>
+    </section>
+
+    <section class="section">
+      <div class="steps">
+        <div class="step"><b>1</b><strong>Select</strong><span>Choose one game and one or more services for that game.</span></div>
+        <div class="step"><b>2</b><strong>Quote</strong><span>Send server, quantity and notes for a clean backend review.</span></div>
+        <div class="step"><b>3</b><strong>Dispatch</strong><span>Support assigns the order to the right staff or supplier.</span></div>
+        <div class="step"><b>4</b><strong>Deliver</strong><span>Track status and contact support if anything needs attention.</span></div>
+      </div>
+    </section>
+
+    <section id="quote" class="section two-col">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Request a Quote</h2>
+          <span class="badge">Same game, multiple items</span>
+        </div>
+        <form id="quoteForm" class="panel-body">
+          <div class="form-grid">
+            <label class="field">
+              <span>Email</span>
+              <input name="customer" type="email" placeholder="you@example.com" required />
+            </label>
+            <label class="field">
+              <span>Game</span>
+              <input name="game" placeholder="Diablo 4" required />
+            </label>
+            <label class="field">
+              <span>Service / item</span>
+              <input name="project" placeholder="Gold, gear, boosting..." required />
+            </label>
+            <label class="field">
+              <span>Server / region</span>
+              <input name="server" placeholder="US / Season / Server" />
+            </label>
+            <label class="field">
+              <span>Quantity</span>
+              <input name="qty" placeholder="1, 100M, 3 runs..." />
+            </label>
+            <label class="field">
+              <span>Game ID</span>
+              <input name="gameId" placeholder="BattleTag, UID or character name" />
+            </label>
+            <label class="field wide">
+              <span>Order details</span>
+              <textarea name="details" placeholder="Tell us item stats, target level, dungeon, delivery time or screenshots you will provide later."></textarea>
+            </label>
+          </div>
+          <button class="btn" type="submit">Submit quote request</button>
+        </form>
+      </div>
+
+      <aside class="panel" id="lookup">
+        <div class="panel-head">
+          <h3>Order Lookup</h3>
+          <span class="badge">EZ + numbers</span>
+        </div>
+        <div class="panel-body">
+          <div class="inline">
+            <label class="field" style="flex:1">
+              <span>Order number</span>
+              <input id="lookupNo" placeholder="EZ2606111008" />
+            </label>
+            <button id="lookupBtn" class="btn secondary" type="button">Lookup</button>
+          </div>
+          <div id="lookupResult" class="status-box">Enter your order number to see the public status.</div>
+        </div>
+      </aside>
+    </section>
+
+    <section id="support" class="section two-col">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Contact Support</h2>
+          <span class="badge">Message alert</span>
+        </div>
+        <div class="panel-body">
+          <div class="form-grid">
+            <label class="field">
+              <span>Order number</span>
+              <input id="supportOrderNo" placeholder="EZ2606111008" />
+            </label>
+            <label class="field">
+              <span>Your name</span>
+              <input id="supportName" placeholder="Name" />
+            </label>
+            <label class="field wide">
+              <span>Message</span>
+              <textarea id="supportMessage" placeholder="Describe the problem. Support will see it in the backend message notification page."></textarea>
+            </label>
+          </div>
+          <button id="supportBtn" class="btn" type="button">Send support message</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Safe Service Logic</h3>
+        </div>
+        <div class="panel-body">
+          <div class="status-box"><strong>One order, one game</strong><span>Multiple services can be included only under the same game, matching your backend dispatch rule.</span></div>
+          <div class="status-box"><strong>Human support handoff</strong><span>Customer messages go into backend notifications so support can join the chat by order number.</span></div>
+          <div class="status-box"><strong>Backend controlled</strong><span>Prices, service content and images are managed from the admin console.</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>EZ2GM Game Services</span>
+    <span>Customer storefront: ez2gm.com | Staff console: admin.ez2gm.com</span>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const API_BASE = location.hostname === "localhost" || location.hostname === "127.0.0.1"
+      ? "http://127.0.0.1:8020"
+      : "https://api.ez2gm.com";
+
+    const fallbackServices = [
+      { game: "Diablo 4", project: "Legendary gear", serviceType: "gear", price: "Manual quote", imageUrl: "/assets/projects/service-gear.png", status: "active" },
+      { game: "World of Warcraft", project: "Gold delivery", serviceType: "gold", price: "Daily market", imageUrl: "/assets/projects/service-gold.png", status: "active" },
+      { game: "Path of Exile", project: "Currency bundle", serviceType: "gold", price: "Daily market", imageUrl: "/assets/projects/project-thumbnail-sheet.png", status: "active" },
+      { game: "Final Fantasy XIV", project: "Dungeon escort", serviceType: "escort", price: "From quote", imageUrl: "/assets/projects/service-escort.png", status: "active" },
+      { game: "Lost Ark", project: "Boosting run", serviceType: "boosting", price: "Manual quote", imageUrl: "/assets/projects/service-carry.png", status: "active" },
+      { game: "Steam / PC", project: "CDK service", serviceType: "cdk", price: "Live price", imageUrl: "/assets/projects/service-cdk.png", status: "active" }
+    ];
+
+    const imageByType = {
+      gold: "/assets/projects/service-gold.png",
+      gear: "/assets/projects/service-gear.png",
+      item: "/assets/projects/service-gear.png",
+      boosting: "/assets/projects/service-carry.png",
+      carry: "/assets/projects/service-carry.png",
+      escort: "/assets/projects/service-escort.png",
+      cdk: "/assets/projects/service-cdk.png",
+      topup: "/assets/projects/service-topup.png"
+    };
+
+    let services = fallbackServices;
+
+    function toast(message) {
+      const node = document.getElementById("toast");
+      node.textContent = message;
+      node.classList.add("show");
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => node.classList.remove("show"), 4200);
+    }
+
+    function imageFor(item) {
+      const value = item.imageUrl || "";
+      if (value.startsWith("http") || value.startsWith("/")) return value;
+      return imageByType[String(item.serviceType || "").toLowerCase()] || "/assets/projects/service-gear.png";
+    }
+
+    function renderServices() {
+      const query = document.getElementById("serviceSearch").value.trim().toLowerCase();
+      const type = document.getElementById("serviceType").value;
+      const grid = document.getElementById("serviceGrid");
+      const filtered = services.filter(item => {
+        const haystack = `${item.game} ${item.project} ${item.serviceType}`.toLowerCase();
+        const typeMatch = !type || String(item.serviceType || "").toLowerCase().includes(type);
+        return (!query || haystack.includes(query)) && typeMatch;
+      });
+      grid.innerHTML = (filtered.length ? filtered : fallbackServices).slice(0, 9).map(item => `
+        <article class="service-card">
+          <img src="${imageFor(item)}" alt="${item.game} ${item.project}" loading="lazy" />
+          <div class="service-body">
+            <div class="service-top">
+              <h3>${item.game}</h3>
+              <span class="badge">${item.serviceType || "service"}</span>
+            </div>
+            <div><strong>${item.project}</strong></div>
+            <div class="service-meta">
+              <span>${item.price || "Manual quote"}</span>
+              <span>${item.status || "active"}</span>
+            </div>
+            <button class="btn secondary choose-service" type="button" data-game="${item.game}" data-project="${item.project}">Request</button>
+          </div>
+        </article>
+      `).join("");
+      document.querySelectorAll(".choose-service").forEach(button => {
+        button.addEventListener("click", () => {
+          const form = document.getElementById("quoteForm");
+          form.elements.game.value = button.dataset.game;
+          form.elements.project.value = button.dataset.project;
+          document.getElementById("quote").scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
+    }
+
+    async function api(path, options = {}) {
+      const response = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers: { "content-type": "application/json", ...(options.headers || {}) }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) throw new Error(data.error || `HTTP_${response.status}`);
+      return data;
+    }
+
+    async function loadCatalog() {
+      renderServices();
+      try {
+        const result = await api("/api/public/catalog");
+        if (Array.isArray(result.data?.projects) && result.data.projects.length) {
+          services = result.data.projects.map(item => ({
+            game: item.game,
+            project: item.project,
+            serviceType: item.serviceType,
+            price: item.price || "Manual quote",
+            imageUrl: item.imageUrl,
+            status: item.status || "active"
+          }));
+          renderServices();
+        }
+      } catch {
+        renderServices();
+      }
+    }
+
+    async function track(action, value = "") {
+      try {
+        await api("/api/analytics/event", {
+          method: "POST",
+          body: JSON.stringify({ page: location.pathname, source: "storefront", action, value })
+        });
+      } catch {}
+    }
+
+    document.getElementById("filterServices").addEventListener("click", () => {
+      renderServices();
+      track("service_search", document.getElementById("serviceSearch").value);
+    });
+    document.getElementById("serviceSearch").addEventListener("input", renderServices);
+    document.getElementById("serviceType").addEventListener("change", renderServices);
+
+    document.getElementById("quoteForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const body = Object.fromEntries(new FormData(form).entries());
+      body.items = [{
+        name: `${body.project}${body.details ? " - " + body.details : ""}`.slice(0, 220),
+        server: body.server || "",
+        qty: body.qty || "1",
+        price: ""
+      }];
+      try {
+        const result = await api("/api/public/orders", { method: "POST", body: JSON.stringify(body) });
+        const orderNo = result.data?.order?.orderNo || result.data?.orderNo || "created";
+        document.getElementById("lookupNo").value = orderNo;
+        document.getElementById("supportOrderNo").value = orderNo;
+        toast(`Quote request created: ${orderNo}`);
+        form.reset();
+        track("quote_created", orderNo);
+      } catch (error) {
+        toast(`Quote request failed: ${error.message}`);
+      }
+    });
+
+    document.getElementById("lookupBtn").addEventListener("click", async () => {
+      const orderNo = document.getElementById("lookupNo").value.trim();
+      if (!orderNo) return toast("Please enter an order number.");
+      const box = document.getElementById("lookupResult");
+      box.textContent = "Checking order...";
+      try {
+        const result = await api(`/api/public/orders/${encodeURIComponent(orderNo)}`);
+        const order = result.data;
+        box.innerHTML = `
+          <strong>${order.orderNo} - ${order.status}</strong>
+          <span>${order.game || ""} / ${order.project || ""}</span>
+          <span>Payment: ${order.payment || "pending"}</span>
+          <span>Items: ${(order.items || []).map(item => `${item.name} ${item.qty || ""}`).join(", ") || "No item rows"}</span>
+        `;
+        document.getElementById("supportOrderNo").value = order.orderNo;
+        track("order_lookup", order.orderNo);
+      } catch (error) {
+        box.textContent = `Order not found or unavailable: ${error.message}`;
+      }
+    });
+
+    document.getElementById("supportBtn").addEventListener("click", async () => {
+      const orderNo = document.getElementById("supportOrderNo").value.trim();
+      const name = document.getElementById("supportName").value.trim();
+      const message = document.getElementById("supportMessage").value.trim();
+      if (!orderNo || !message) return toast("Order number and message are required.");
+      try {
+        await api(`/api/public/chats/${encodeURIComponent(orderNo)}/messages`, {
+          method: "POST",
+          body: JSON.stringify({ body: `${name ? name + ": " : ""}${message}` })
+        });
+        document.getElementById("supportMessage").value = "";
+        toast("Message sent. Support will see it in the backend notification page.");
+        track("support_message", orderNo);
+      } catch (error) {
+        toast(`Message failed: ${error.message}`);
+      }
+    });
+
+    loadCatalog();
+    track("view");
+  </script>
+</body>
+</html>
