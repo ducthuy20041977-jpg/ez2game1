@@ -1,0 +1,14 @@
+name = "ez2gm-api"
+main = "api-worker/src/index.js"
+compatibility_date = "2026-06-13"
+
+workers_dev = true
+
+[vars]
+APP_NAME = "EZ2GM API"
+PUBLIC_ORIGIN = "https://ez2gm.com"
+R2_PUBLIC_BASE_URL = "https://img.ez2gm.com"
+
+[[r2_buckets]]
+binding = "EZ2GM_UPLOADS"
+bucket_name = "ez2gm"

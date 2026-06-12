@@ -1,0 +1,16 @@
+{
+  "name": "ez2gm-cloudflare-deploy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "worker:check": "node --check api-worker/src/index.js",
+    "worker:deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.100.0"
+  }
+}
