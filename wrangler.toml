@@ -1,6 +1,6 @@
 name = "ez2gm-api"
 main = "api-worker/src/index.js"
-compatibility_date = "2026-06-13"
+compatibility_date = "2025-12-01"
 
 workers_dev = true
 
