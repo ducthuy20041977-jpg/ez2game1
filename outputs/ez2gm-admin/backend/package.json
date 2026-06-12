@@ -1,0 +1,19 @@
+{
+  "name": "ez2gm-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node src/server.js",
+    "db:check": "node scripts/check-db.js",
+    "db:migrate": "node scripts/migrate.js",
+    "db:seed": "node scripts/seed.js",
+    "r2:cors": "node scripts/configure-r2-cors.js",
+    "check": "node --check src/server.js && node --check src/data/mock-db.js && node --check src/db/client.js && node --check src/lib/security.js && node --check src/lib/order-number.js && node --check src/middleware/auth.js && node --check src/middleware/permissions.js && node --check src/services/account-service.js && node --check src/services/order-service.js && node --check src/services/chat-service.js && node --check src/services/upload-service.js && node --check src/services/storage-service.js && node --check src/services/payment-service.js && node --check src/services/frontend-content-service.js && node --check src/services/media-publish-service.js && node --check src/services/analytics-service.js && node --check src/services/ai-workforce-service.js && node --check src/services/business-simulation-service.js && node --check src/services/game-project-service.js && node --check src/services/pricing-service.js && node --check scripts/check-db.js && node --check scripts/migrate.js && node --check scripts/seed.js && node --check scripts/configure-r2-cors.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1067.0",
+    "@aws-sdk/s3-request-presigner": "^3.1067.0",
+    "pg": "^8.21.0"
+  }
+}
