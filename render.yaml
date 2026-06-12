@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: ez2gm-api
+    env: node
+    rootDir: outputs/ez2gm-admin/backend
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm run dev
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8020
+      - key: ROOT_DOMAIN
+        value: ez2gm.com
+      - key: FRONTEND_PUBLIC_URL
+        value: https://ez2gm.com
+      - key: API_PUBLIC_URL
+        value: https://api.ez2gm.com
+      - key: R2_ENDPOINT
+        value: https://d643ff49897302d31734dbc69c5895f2.r2.cloudflarestorage.com
+      - key: R2_BUCKET
+        value: ez2gm
+      - key: R2_PUBLIC_BASE_URL
+        value: https://img.ez2gm.com
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
