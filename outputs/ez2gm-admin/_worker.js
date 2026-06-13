@@ -10,6 +10,7 @@ export default {
       "/package.json",
       "/package-lock.json",
       "/wrangler.toml",
+      "/wrangler.worker.toml",
       "/render.yaml",
       "/README.md",
       "/DEPLOYMENT.md",
