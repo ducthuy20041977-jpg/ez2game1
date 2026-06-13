@@ -343,6 +343,7 @@ function sanitizeChatText(text) {
   let output = String(text || "");
   output = output.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, match => "*".repeat(Math.min(Math.max(match.length, 4), 12)));
   output = output.replace(/https?:\/\/[^\s]+|www\.[^\s]+/gi, match => "*".repeat(Math.min(Math.max(match.length, 4), 12)));
+  output = output.replace(/(^|[^\w])(\+?\d[\d\s().-]{5,}\d)(?=$|[^\w])/g, (_match, prefix, value) => prefix + "*".repeat(Math.min(Math.max(value.length, 4), 12)));
   output = output.replace(/微信|QQ|whatsapp|telegram|discord|skype|私下|私聊|联系方式|outside payment|private deal|bank transfer|phone|email/gi, match => "*".repeat(Math.min(Math.max(match.length, 4), 12)));
   return output;
 }
