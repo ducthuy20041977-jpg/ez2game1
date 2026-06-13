@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
@@ -1479,11 +1479,10 @@
           </select>
         </label>
         <label>密码
-          <input id="loginPassword" type="password" value="demo123" />
+          <input id="loginPassword" type="password" autocomplete="current-password" />
         </label>
         <div class="login-options">
           <label><input type="checkbox" checked /> 记住本机角色</label>
-          <span>演示密码：demo123</span>
         </div>
         <button class="btn primary login-submit" id="loginBtn">进入后台</button>
       </div>
@@ -3867,7 +3866,7 @@ Fortnite,Gift Pack CDK,CDK,$15.99,$10.00,自动,草稿,assets/projects/service-c
             <label>负责服务<select><option>Gold / Currency</option><option>Items</option><option>Boosting</option><option>CDK</option></select></label>
             <label>结算周期<select><option>每日</option><option>每周</option><option>手动结算</option></select></label>
             <label>联系方式<input value="Telegram / WhatsApp / Email" /></label>
-            <label>初始密码<input value="demo123" /></label>
+            <label>初始密码<input type="password" autocomplete="new-password" /></label>
             <label style="grid-column:1 / -1;">备注<textarea>新增后供应商只看分配给自己的订单通知、完成上传截图和已完成订单金额。</textarea></label>
             <button class="btn primary" id="saveNewSupplier">保存供应商</button>
             <button class="btn">保存草稿</button>
@@ -3995,7 +3994,7 @@ Fortnite,Gift Pack CDK,CDK,$15.99,$10.00,自动,草稿,assets/projects/service-c
         <label>账号<input id="newAccountName" value="service-new" /></label>
         <label>角色<select id="newAccountRole"><option>人工客服</option><option>管理员</option><option>销售</option><option>供应商</option></select></label>
         <label>游戏权限<input id="newAccountGames" value="Diablo 4, POE2" /></label>
-        <label>初始密码<input id="newAccountPassword" value="demo12345" /></label>
+        <label>初始密码<input id="newAccountPassword" type="password" autocomplete="new-password" /></label>
         <label style="grid-column:1 / -1;">备注<input id="newAccountNote" value="新账号，待老板确认负责人" /></label>
         <button class="btn primary" id="saveNewAccount">保存账号</button>
         <button class="btn" id="saveNewAccountDraft">保存草稿</button>
@@ -4674,7 +4673,7 @@ Fortnite,Gift Pack CDK,CDK,$15.99,$10.00,自动,草稿,assets/projects/service-c
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           account: role.account,
-          password: document.getElementById("loginPassword")?.value || "demo123"
+          password: document.getElementById("loginPassword")?.value || ""
         })
       });
       const payload = await response.json().catch(() => ({}));
@@ -4873,21 +4872,24 @@ Fortnite,Gift Pack CDK,CDK,$15.99,$10.00,自动,草稿,assets/projects/service-c
       });
     });
 
-    document.getElementById("loginBtn").addEventListener("click", () => {
-      currentRole = loginRole.value;
+    document.getElementById("loginBtn").addEventListener("click", async () => {
+      const requestedRole = loginRole.value;
       accountApiState.token = "";
       accountApiState.actor = null;
       accountApiState.role = "";
       supplierSoundMutedAfterAccept = false;
-      loginScreen.classList.add("hidden");
-      updateRoleChrome();
-      setSection(firstAllowedSection());
-      showToast(`${roles[currentRole].label}已登录，权限页面已加载。`);
-      loginBackendSession(currentRole)
-        .then(() => {
-          if (currentRole === "owner") loadAccountsFromApi(true);
-        })
-        .catch(() => showToast("已进入本地后台，后端账号接口稍后可重试。"));
+      try {
+        await loginBackendSession(requestedRole);
+        currentRole = accountApiState.actor?.role && roles[accountApiState.actor.role] ? accountApiState.actor.role : requestedRole;
+        loginScreen.classList.add("hidden");
+        updateRoleChrome();
+        setSection(firstAllowedSection());
+        showToast(`${roles[currentRole].label}已登录，权限页面已加载。`);
+        if (currentRole === "owner") loadAccountsFromApi(true);
+      } catch (error) {
+        currentRole = null;
+        showToast(error.message === "ACCOUNT_LOCKED" ? "账号已锁定，请稍后再试。" : "登录失败，请检查账号和密码。");
+      }
     });
 
     document.getElementById("logoutBtn").addEventListener("click", () => {
@@ -6816,8 +6818,8 @@ Fortnite,Gift Pack CDK,CDK,$15.99,$10.00,自动,草稿,assets/projects/service-c
         "API_PUBLIC_URL=https://api.ez2gm.com",
         "SESSION_SECRET=replace-with-random-secret",
         "COOKIE_DOMAIN=ez2gm.com",
-        "R2_BUCKET_URL=https://d643ff49897302d31734dbc69c5895f2.r2.cloudflarestorage.com/ez2gm",
-        "R2_ENDPOINT=https://d643ff49897302d31734dbc69c5895f2.r2.cloudflarestorage.com",
+        "R2_BUCKET_URL=https://img.ez2gm.com",
+        "R2_ENDPOINT=https://ACCOUNT_ID.r2.cloudflarestorage.com",
         "R2_BUCKET=ez2gm",
         "R2_ACCESS_KEY_ID=replace-with-key",
         "R2_SECRET_ACCESS_KEY=replace-with-secret",
@@ -8412,15 +8414,7 @@ Fortnite,Gift Pack CDK,CDK,$15.99,$10.00,自动,草稿,assets/projects/service-c
     const previewRole = previewParams.get("role");
     const previewSection = previewParams.get("section");
     if (previewRole && roles[previewRole]) {
-      currentRole = previewRole;
-      loginScreen.classList.add("hidden");
-      updateRoleChrome();
-      setSection(previewSection && canAccess(previewSection) ? previewSection : firstAllowedSection());
-      loginBackendSession(currentRole)
-        .then(() => {
-          if (currentRole === "owner") loadAccountsFromApi(true);
-        })
-        .catch(() => showToast("已进入本地预览，后端账号接口稍后可重试。"));
+      showToast("后台已关闭链接预览，请先登录。");
     }
 
   </script>
