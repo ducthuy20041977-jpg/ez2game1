@@ -16,6 +16,7 @@ import { listGameProjects, createGameProject, bulkCreateGameProjects } from "./s
 import { getPricingRules, simulatePricing } from "./services/pricing-service.js";
 import { runBusinessSimulation, businessLoopAudit } from "./services/business-simulation-service.js";
 import { listAccounts, createAccount, updateAccount, deleteAccount } from "./services/account-service.js";
+import { sfGames, sfGame, sfCategories, sfProducts, sfProduct, sfCreateOrder } from "./services/storefront-service.js";
 import { db } from "./data/mock-db.js";
 import { databaseStatus } from "./db/client.js";
 
@@ -37,6 +38,39 @@ addRoute("POST", "/api/auth/logout", async ({ req, actor }) => {
   audit(actor, "logout", "session", actor.sessionId);
   return { ok: true, removed };
 });
+
+// ===== 商城公开接口（买家无需登录）=====
+addRoute("GET", "/api/storefront/games", async ({ url }) => {
+  const all = await sfGames();
+  const hot = url.searchParams.get("hot");
+  const data = hot === "true" ? all.filter(g => g.hot) : all;
+  return { ok: true, data };
+}, { public: true });
+
+addRoute("GET", "/api/storefront/games/:slug", async ({ params }) => {
+  const game = await sfGame(params.slug);
+  if (!game) return { status: 404, payload: { ok: false, error: "GAME_NOT_FOUND" } };
+  return { ok: true, data: game };
+}, { public: true });
+
+addRoute("GET", "/api/storefront/categories", async () => ({ ok: true, data: await sfCategories() }), { public: true });
+
+addRoute("GET", "/api/storefront/products", async ({ url }) => {
+  const q = Object.fromEntries(url.searchParams.entries());
+  return { ok: true, data: await sfProducts(q) };
+}, { public: true });
+
+addRoute("GET", "/api/storefront/products/:id", async ({ params }) => {
+  const product = await sfProduct(params.id);
+  if (!product) return { status: 404, payload: { ok: false, error: "PRODUCT_NOT_FOUND" } };
+  return { ok: true, data: product };
+}, { public: true });
+
+addRoute("POST", "/api/storefront/orders", async ({ body }) => {
+  const record = await sfCreateOrder(body);
+  return { status: 201, payload: { ok: true, data: record } };
+}, { public: true });
+
 addRoute("GET", "/api/security/policy", async () => ({ ok: true, data: listRolePolicies() }));
 addRoute("GET", "/api/security/sessions", async () => ({ ok: true, data: listSessions() }));
 addRoute("GET", "/api/accounts", async () => ({ ok: true, data: await listAccounts() }));
