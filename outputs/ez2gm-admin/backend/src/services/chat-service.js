@@ -11,6 +11,7 @@ export function sanitizeChatText(text) {
   let output = String(text || "");
   output = output.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, match => maskValue(match));
   output = output.replace(/https?:\/\/[^\s]+|www\.[^\s]+/gi, match => maskValue(match));
+  output = output.replace(/(^|[^\w])(\+?\d[\d\s().-]{5,}\d)(?=$|[^\w])/g, (_match, prefix, value) => prefix + maskValue(value));
   output = output.replace(/私下交易|私聊|加我|联系我|微信|QQ|whatsapp|telegram|discord|skype|outside payment|private deal|bank transfer|phone|email/gi, match => maskValue(match));
   return output;
 }
