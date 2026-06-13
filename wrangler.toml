@@ -1,15 +1,3 @@
-name = "ez2gm-api"
-main = "api-worker/src/index.js"
+name = "ez2game1"
 compatibility_date = "2025-12-01"
 pages_build_output_dir = "outputs/ez2gm-admin"
-
-workers_dev = true
-
-[vars]
-APP_NAME = "EZ2GM API"
-PUBLIC_ORIGIN = "https://ez2gm.com"
-R2_PUBLIC_BASE_URL = "https://img.ez2gm.com"
-
-[[r2_buckets]]
-binding = "EZ2GM_UPLOADS"
-bucket_name = "ez2gm"
