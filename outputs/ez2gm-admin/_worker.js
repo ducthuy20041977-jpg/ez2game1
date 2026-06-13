@@ -50,6 +50,14 @@ export default {
       return env.ASSETS.fetch(request);
     }
 
+    // 新商城前端（预览）：/shop 子路由 SPA 回退到 shop/index.html
+    if (url.pathname === "/shop" || url.pathname.startsWith("/shop/")) {
+      const shopTarget = new URL(request.url);
+      shopTarget.pathname = "/shop/index.html";
+      shopTarget.search = "";
+      return env.ASSETS.fetch(new Request(shopTarget, request));
+    }
+
     const target = new URL(request.url);
     if (host === "admin.ez2gm.com") {
       if (url.search) {
