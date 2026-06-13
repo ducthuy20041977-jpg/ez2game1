@@ -1,4 +1,4 @@
-﻿# EZ2GM Backend Skeleton
+# EZ2GM Backend Skeleton
 
 This is a low-cost Node.js API for the EZ operation console. It runs in memory for local previews and switches to PostgreSQL when `DATABASE_URL` is configured.
 
@@ -48,16 +48,16 @@ npm.cmd run dev
 
 ## Cloudflare R2 Uploads
 
-The current R2 bucket URL is configured as:
+The public upload domain is configured as:
 
 ```text
-https://d643ff49897302d31734dbc69c5895f2.r2.cloudflarestorage.com/ez2gm
+https://img.ez2gm.com
 ```
 
 For real browser uploads, add these environment variables to the backend deployment:
 
 ```powershell
-$env:R2_ENDPOINT="https://d643ff49897302d31734dbc69c5895f2.r2.cloudflarestorage.com"
+$env:R2_ENDPOINT="https://ACCOUNT_ID.r2.cloudflarestorage.com"
 $env:R2_BUCKET="ez2gm"
 $env:R2_ACCESS_KEY_ID="..."
 $env:R2_SECRET_ACCESS_KEY="..."
@@ -80,7 +80,7 @@ npm.cmd run check       # syntax check backend and scripts
 ## Test Login
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri http://localhost:8020/api/auth/login -ContentType "application/json" -Body '{"account":"owner@ez","password":"demo123"}'
+Invoke-RestMethod -Method Post -Uri http://localhost:8020/api/auth/login -ContentType "application/json" -Body '{"account":"owner@ez","password":"replace-with-admin-password"}'
 ```
 
 Use the returned token:
