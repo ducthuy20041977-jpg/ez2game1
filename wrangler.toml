@@ -1,6 +1,7 @@
 name = "ez2gm-api"
 main = "api-worker/src/index.js"
 compatibility_date = "2025-12-01"
+pages_build_output_dir = "outputs/ez2gm-admin"
 
 workers_dev = true
 
