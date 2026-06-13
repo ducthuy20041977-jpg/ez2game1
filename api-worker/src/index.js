@@ -305,11 +305,38 @@ function safeFileName(name = "upload.bin") {
   return String(name || "upload.bin").replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 120);
 }
 
+function cleanText(value = "", maxLength = 240) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
 function maskValue(value = "", visibleTail = 4) {
   const text = String(value || "");
   if (!text) return "";
   if (text.length <= visibleTail) return "*".repeat(text.length);
   return `${"*".repeat(Math.max(4, text.length - visibleTail))}${text.slice(-visibleTail)}`;
+}
+
+function maskEmail(value = "") {
+  const text = String(value || "");
+  const [name, domain] = text.split("@");
+  if (!name || !domain) return maskValue(text);
+  return `${name.slice(0, 2)}${"*".repeat(Math.max(3, name.length - 2))}@${domain}`;
+}
+
+function accountPayload(user = {}) {
+  return {
+    id: user.id,
+    account: user.account,
+    role: user.role,
+    status: user.status,
+    note: user.note || "",
+    supplierCode: user.supplier_code || null,
+    lastLoginAt: user.last_login_at,
+    failedLoginCount: user.failed_login_count || 0,
+    lockedUntil: user.locked_until,
+    hasPasswordHash: Boolean(user.has_password_hash ?? user.password_hash),
+    permissions: rolePolicies[user.role] || null
+  };
 }
 
 function sanitizeChatText(text) {
@@ -414,22 +441,23 @@ function checkPermission(role, method, pathname) {
 
 async function publicOrderFromRow(row, actor, env) {
   const reveal = Boolean(rolePolicies[actor?.role]?.canRevealOrderSecrets);
+  const canReadFinance = Boolean(rolePolicies[actor?.role]?.canReadFinance);
   const gameId = await decryptText(row.game_id_cipher, env);
   const account = await decryptText(row.account_cipher, env);
   const password = await decryptText(row.password_cipher, env);
   return {
     orderNo: row.order_no,
-    customer: row.customer_email,
+    customer: reveal ? row.customer_email : maskEmail(row.customer_email),
     game: row.game,
     project: row.project,
-    gameId,
-    account,
+    gameId: reveal ? gameId : maskValue(gameId),
+    account: reveal ? account : maskValue(account),
     password: reveal ? password : maskValue(password),
     status: row.status,
     payment: row.payment_status,
-    agent: row.agent || "",
-    supplier: row.supplier || "",
-    profit: row.profit || "",
+    agent: reveal ? row.agent || "" : "",
+    supplier: reveal || actor?.role === "supplier" ? row.supplier || "" : "",
+    profit: canReadFinance ? row.profit || "" : "",
     encryptionVersion: row.encryption_version,
     sensitiveFieldsEncrypted: Boolean(row.game_id_cipher || row.account_cipher || row.password_cipher)
   };
@@ -448,6 +476,9 @@ async function getOrderRecord(orderNo, actor, env) {
     query(env, "select * from uploads where order_id = $1 or order_no = $2 order by created_at desc", [order.id, normalized])
   ]);
 
+  const reveal = Boolean(rolePolicies[actor?.role]?.canRevealOrderSecrets);
+  const canReadFinance = Boolean(rolePolicies[actor?.role]?.canReadFinance);
+
   return {
     order: await publicOrderFromRow(order, actor, env),
     items: items.map(item => ({
@@ -455,13 +486,13 @@ async function getOrderRecord(orderNo, actor, env) {
       server: item.server || "",
       qty: item.qty || "",
       price: item.price || "",
-      supplierPrice: item.supplier_price || "",
+      supplierPrice: canReadFinance ? item.supplier_price || "" : "",
       status: item.status
     })),
     dispatch: dispatches[0] ? {
       mode: dispatches[0].mode || "",
-      service: dispatches[0].service_account || "",
-      supplier: dispatches[0].supplier_code || "",
+      service: reveal ? dispatches[0].service_account || "" : "",
+      supplier: reveal || actor?.role === "supplier" ? dispatches[0].supplier_code || "" : "",
       deadline: dispatches[0].deadline || "",
       lock: dispatches[0].lock_state || ""
     } : null,
@@ -542,16 +573,40 @@ async function getPublicOrderStatus({ params, env }) {
 }
 
 async function createPublicOrder({ body, env }) {
-  return createOrder({
+  const sourceItems = Array.isArray(body.items) && body.items.length ? body.items : [{ name: body.project || "Custom Item", server: body.server || "", qty: body.qty || "1", price: "" }];
+  const items = sourceItems.slice(0, 20).map(item => ({
+    name: cleanText(item.name || item.itemName || body.project || "Custom Item", 220),
+    server: cleanText(item.server || body.server || "", 80),
+    qty: cleanText(item.qty || "1", 40),
+    price: cleanText(item.price || "", 40),
+    status: "pending"
+  }));
+  const orderNo = createOrderNo();
+  const game = cleanText(body.game || "", 80);
+  const project = cleanText(body.project || items[0]?.name || "Custom Item", 120);
+  if (!body.customer || !game || !project) {
+    return { status: 400, payload: { ok: false, error: "CUSTOMER_GAME_PROJECT_REQUIRED" } };
+  }
+  const created = await createOrder({
     body: {
-      ...body,
+      customer: cleanText(body.customer, 160),
+      game,
+      project,
+      gameId: cleanText(body.gameId, 120),
+      account: "",
+      password: "",
+      items,
+      orderNo,
+      preventOverwrite: true,
       payment: body.payment || "manual-quote",
-      supplierPrice: "",
       profit: ""
     },
     actor: { account: "frontend-customer", role: "public" },
     env
   });
+  if (created.status && created.status >= 400) return created;
+  const status = await getPublicOrderStatus({ params: { orderNo }, env });
+  return { status: 201, payload: status };
 }
 
 async function ensureThread(orderNo, actor, env) {
@@ -585,10 +640,18 @@ async function loginHandler({ body, env }) {
   const account = String(body.account || "").trim().toLowerCase();
   const rows = await query(env, "select * from users where lower(account) = $1 and status = 'active' limit 1", [account]);
   const user = rows[0];
+  if (user?.locked_until && new Date(user.locked_until).getTime() > Date.now()) {
+    return { status: 423, payload: { ok: false, error: "ACCOUNT_LOCKED", lockedUntil: user.locked_until } };
+  }
   if (!user || !(await verifyPassword(body.password || "", user.password_hash))) {
-    if (user) await query(env, "update users set failed_login_count = failed_login_count + 1, updated_at = now() where id = $1", [user.id]);
+    if (user) {
+      const failedCount = Number(user.failed_login_count || 0) + 1;
+      const lockUntil = failedCount >= 5 ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : null;
+      await query(env, "update users set failed_login_count = $2, locked_until = $3::timestamptz, updated_at = now() where id = $1", [user.id, failedCount, lockUntil]);
+    }
     return { status: 401, payload: { ok: false, error: "INVALID_LOGIN" } };
   }
+  await query(env, "update users set failed_login_count = 0, locked_until = null, last_login_at = now(), updated_at = now() where id = $1", [user.id]);
   const actor = {
     id: user.id,
     account: user.account,
@@ -602,26 +665,15 @@ async function loginHandler({ body, env }) {
 
 async function listAccounts({ env }) {
   const rows = await query(env, `
-    select id, account, role, status, note, supplier_code, last_login_at, failed_login_count, locked_until, password_hash
+    select id, account, role, status, note, supplier_code, last_login_at, failed_login_count, locked_until,
+      password_hash is not null as has_password_hash
     from users
     order by case role when 'owner' then 1 when 'admin' then 2 when 'service' then 3 when 'sales' then 4 when 'supplier' then 5 else 9 end, account
   `);
   return {
     ok: true,
     data: {
-      accounts: rows.map(user => ({
-        id: user.id,
-        account: user.account,
-        role: user.role,
-        status: user.status,
-        note: user.note || "",
-        supplierCode: user.supplier_code || null,
-        lastLoginAt: user.last_login_at,
-        failedLoginCount: user.failed_login_count || 0,
-        lockedUntil: user.locked_until,
-        hasPasswordHash: Boolean(user.password_hash),
-        permissions: rolePolicies[user.role] || null
-      })),
+      accounts: rows.map(accountPayload),
       roles: rolePolicies
     }
   };
@@ -641,10 +693,11 @@ async function createAccount({ body, actor, env }) {
   const rows = await query(env, `
     insert into users (id, account, password_hash, role, status, note, supplier_code)
     values ($1, $2, $3, $4, $5, $6, $7)
-    returning id, account, role, status, note, supplier_code, last_login_at, failed_login_count, locked_until, password_hash
+    returning id, account, role, status, note, supplier_code, last_login_at, failed_login_count, locked_until,
+      password_hash is not null as has_password_hash
   `, [crypto.randomUUID(), account, passwordHash, body.role || "service", body.status || "active", String(body.note || ""), body.supplierCode || null]);
   await audit(env, actor, "create_account", "user", rows[0].id, { account, role: body.role || "service" });
-  return { status: 201, payload: { ok: true, data: rows[0] } };
+  return { status: 201, payload: { ok: true, data: accountPayload(rows[0]) } };
 }
 
 async function hashPassword(password, env) {
@@ -668,7 +721,8 @@ async function updateAccount({ params, body, actor, env }) {
     set account = $2, password_hash = $3, role = $4, status = $5, note = $6, supplier_code = $7,
         failed_login_count = $8, locked_until = $9, updated_at = now()
     where id = $1
-    returning id, account, role, status, note, supplier_code, last_login_at, failed_login_count, locked_until, password_hash
+    returning id, account, role, status, note, supplier_code, last_login_at, failed_login_count, locked_until,
+      password_hash is not null as has_password_hash
   `, [
     params.id,
     body.account ? String(body.account).trim() : user.account,
@@ -681,7 +735,7 @@ async function updateAccount({ params, body, actor, env }) {
     body.password || body.unlock === true ? null : user.locked_until
   ]);
   await audit(env, actor, "update_account", "user", params.id, { role: body.role || user.role });
-  return { ok: true, data: updated[0] };
+  return { ok: true, data: accountPayload(updated[0]) };
 }
 
 async function deleteAccount({ params, actor, env }) {
@@ -700,6 +754,10 @@ async function createOrder({ body, actor, env }) {
   const items = Array.isArray(body.items) && body.items.length ? body.items : [{ name: body.project || "Custom Item", qty: "1", price: body.price || "" }];
   const orderId = id("order", orderNo);
   const paid = body.payment === "paid" || body.payment === "frontend-paid";
+  if (body.preventOverwrite) {
+    const existing = await query(env, "select id from orders where order_no = $1 limit 1", [orderNo]);
+    if (existing[0]) return { status: 409, payload: { ok: false, error: "ORDER_NO_CONFLICT" } };
+  }
   await query(env, `
     insert into orders (
       id, order_no, customer_email, game, project, game_id_cipher, account_cipher,
@@ -785,7 +843,8 @@ async function getMessages({ params, actor, env }) {
 async function addMessage({ params, body, actor, env }) {
   const thread = await ensureThread(params.orderNo, actor, env);
   if (!thread) return { status: 404, payload: { ok: false, error: "ORDER_NOT_FOUND" } };
-  const cleanBody = sanitizeChatText(body.body || "");
+  const cleanBody = sanitizeChatText(cleanText(body.body || "", 1000));
+  if (!cleanBody) return { status: 400, payload: { ok: false, error: "MESSAGE_REQUIRED" } };
   const message = {
     id: crypto.randomUUID(),
     sender: body.sender || actor.role,
@@ -802,6 +861,19 @@ async function addMessage({ params, body, actor, env }) {
   }
   await audit(env, actor, "send_chat_message", "order", normalizeOrderNo(params.orderNo));
   return { status: 201, payload: { ok: true, data: message } };
+}
+
+async function verifyPaymentWebhook({ request, params, env }) {
+  const platform = String(params.platform || "").replace(/[^a-zA-Z0-9_]/g, "_").toUpperCase();
+  const secret = env[`${platform}_WEBHOOK_SECRET`] || env.PAYMENT_WEBHOOK_SECRET || "";
+  if (!secret) return { ok: false, status: 503, error: "WEBHOOK_SECRET_NOT_CONFIGURED" };
+  const provided = request.headers.get("x-ez2gm-webhook-secret") ||
+    request.headers.get("x-webhook-secret") ||
+    (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  if (!provided || !(await timingSafeEqual(provided, secret))) {
+    return { ok: false, status: 401, error: "INVALID_WEBHOOK_SIGNATURE" };
+  }
+  return { ok: true };
 }
 
 async function createSignedUpload({ body, actor, env, request }) {
@@ -1045,7 +1117,9 @@ const routes = [
     await query(env, "insert into analytics_events (id, page, source, action, value, user_code, region, game, status, service) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)", [crypto.randomUUID(), body.page || "/", body.source || "", body.action || "view", body.value || "", body.userCode || "", body.region || "", body.game || "", body.status || "", body.service || ""]);
     return { status: 201, payload: { ok: true } };
   }],
-  ["POST", "/api/payments/:platform/webhook", async ({ params, body, env }) => {
+  ["POST", "/api/payments/:platform/webhook", async ({ params, body, env, request }) => {
+    const verification = await verifyPaymentWebhook({ request, params, env });
+    if (!verification.ok) return { status: verification.status, payload: { ok: false, error: verification.error } };
     const orderNo = normalizeOrderNo(body.orderNo);
     const orders = orderNo ? await query(env, "select id from orders where order_no = $1 limit 1", [orderNo]) : [];
     await query(env, "insert into payment_webhooks (id, order_id, platform, amount, event_id, verified_at) values ($1,$2,$3,$4,$5,now()) on conflict (event_id) do nothing", [crypto.randomUUID(), orders[0]?.id || null, params.platform, body.amount || "", body.eventId || crypto.randomUUID()]);
