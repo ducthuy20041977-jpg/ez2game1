@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "worker:check": "node --check api-worker/src/index.js",
-    "worker:deploy": "wrangler deploy"
+    "worker:deploy": "wrangler deploy --config wrangler.worker.toml",
+    "pages:deploy": "wrangler pages deploy outputs/ez2gm-admin --project-name ez2game1"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0"
